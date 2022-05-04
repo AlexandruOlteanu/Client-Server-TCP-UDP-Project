@@ -23,7 +23,7 @@ struct subscriber_info {
 struct database {
     multiset<string> id_subscribers;
     multiset<subscriber_info> subscribers;
-
+    map<int32_t, subscriber_info> connected_subscribers;
 
 };
 
@@ -43,7 +43,18 @@ bool check_exit_command() {
     return false;
 }
 
+void send_close_message_subscriber(int32_t closing_socket) {
+    int check_res = send(closing_socket, "Close", 5, 0);
+    ERROR(check_res < 0, "Error, Closing message failed");
+}
+
 void shutdown_server(int32_t &socketfd_udp, int32_t &socketfd_tcp) {
+    cout << "Am ajuns aici\n";
+    for (auto u : server_database.connected_subscribers) {
+        send_close_message_subscriber(u.first);
+    }
+    server_database.connected_subscribers.clear();
+
     shutdown(socketfd_udp, 2);
     shutdown(socketfd_tcp, 2);
 }
@@ -63,6 +74,7 @@ void process_subscriber(sockaddr_in &subscriber, int32_t socket_tcp) {
         cout << "New client " << current_subscriber_info.id_client << " connected from " << 
         current_subscriber_info.ip_server << ":" << current_subscriber_info.server_port <<".\n";
         server_database.id_subscribers.insert(current_subscriber_info.id_client);
+        server_database.connected_subscribers.insert({socket_tcp, current_subscriber_info});
     }
     else {
         cout << "Client " << current_subscriber_info.id_client << " already connected.\n";
@@ -134,6 +146,8 @@ int main(int argc, char *argv[]) {
 
             if (FD_ISSET(socketfd_udp, &temporary_fds) && i == socketfd_udp) {
                 
+                
+
                 continue;
             }
 
@@ -149,7 +163,21 @@ int main(int argc, char *argv[]) {
 
                 continue;
             }
-            
+
+            if (FD_ISSET(i, &temporary_fds)) {
+                char message[MAX_SIZE];
+                check_ret = recv(i, message, sizeof(message), 0);
+                ERROR(check_ret < 0, "Error, recieving message failed");
+
+                if (!check_ret) {
+                    subscriber_info disconnected_subscriber = server_database.connected_subscribers[i];
+                    server_database.connected_subscribers.erase(i);
+                    server_database.id_subscribers.erase(disconnected_subscriber.id_client);
+                    cout << "Client " << disconnected_subscriber.id_client << " disconnected.\n";
+                    close(i);
+                    FD_CLR(i, &read_fds);
+                }
+            }
 
         }
     }

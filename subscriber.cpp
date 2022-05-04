@@ -36,7 +36,6 @@ void check_command(int32_t socketfd_tcp, string command_message) {
         }
     }
     if (ok) {
-        cout << "Am ajuns aici\n";
         char *buffer = (char *)malloc((int) message.size() * sizeof(char));
         memset(buffer, 0, sizeof(buffer));
         strcpy(buffer, message.c_str());
@@ -114,13 +113,13 @@ int main(int argc, char *argv[]) {
                 continue;
             }
 
-            if (i == socketfd_tcp && FD_ISSET(socketfd_tcp, &temporary_fds)) {
+            if (FD_ISSET(socketfd_tcp, &temporary_fds)) {
                 char *buffer = (char *)malloc(MAX_SIZE * sizeof(char));
                 check_ret = recv(socketfd_tcp, buffer, sizeof(buffer), 0);
                 ERROR(check_ret < 0, "Error, recieving from socket");
-
                 string message = buffer;
-                if (message == "Error") {
+                if (message == "Close") {
+                    main_condition = 0;
                     break;
                 }
                 cout << message << '\n';
