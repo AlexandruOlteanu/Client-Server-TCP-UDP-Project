@@ -13,11 +13,9 @@
 
 using namespace std;
 
-bool check_exit_command() {
+bool check_exit_command(string message) {
 
-    string message = "";
     string exit_message = "exit";
-    cin >> message;
     for (int i = 0; i < (int) exit_message.size(); ++i) {
         if (message[i] != exit_message[i]) {
             return true;
@@ -26,9 +24,7 @@ bool check_exit_command() {
     return false;
 }
 
-void check_command(int32_t socketfd_tcp, string command_message) {
-    string message = "";
-    cin >> message;
+void check_command(int32_t socketfd_tcp, string message, string command_message) {
     bool ok = 1;
     for (int i = 0; i < (int) command_message.size(); ++i) {
         if (message[i] != command_message[i]) {
@@ -104,25 +100,33 @@ int main(int argc, char *argv[]) {
 
         for (int i = 0; i <= maximum_fd; ++i) {
             if (i == STDIN_FILENO && FD_ISSET(STDIN_FILENO, &temporary_fds)) {
-                main_condition &= check_exit_command();
+                string message;
+                getline(cin, message);
+                main_condition &= check_exit_command(message);
                 if (!main_condition) {
                     break;
                 }
-                check_command(socketfd_tcp, "subscribe");
-                check_command(socketfd_tcp, "unsubscribe");
+                check_command(socketfd_tcp, message, "subscribe");
+                check_command(socketfd_tcp, message, "unsubscribe");
                 continue;
             }
 
-            if (FD_ISSET(socketfd_tcp, &temporary_fds)) {
+            if (FD_ISSET(i, &temporary_fds)) {
                 char *buffer = (char *)malloc(MAX_SIZE * sizeof(char));
-                check_ret = recv(socketfd_tcp, buffer, sizeof(buffer), 0);
-                ERROR(check_ret < 0, "Error, recieving from socket");
-                string message = buffer;
-                if (message == "Close") {
-                    main_condition = 0;
-                    break;
+                memset(buffer, 0, sizeof(buffer));
+                int32_t j = 0;
+                check_ret = 1;
+                while (true) {
+                    char c = '#';
+                    check_ret = recv(i, &c, 1, 0);
+                    ERROR(check_ret != 1, "Error, failed to read one byte");
+                    buffer[j] = c;
+                    if (c == '\n') {
+                        break;
+                    }
+                    ++j;
                 }
-                cout << message << '\n';
+                cout << buffer;
             }
         }
     }

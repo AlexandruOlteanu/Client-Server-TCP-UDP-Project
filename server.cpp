@@ -17,14 +17,28 @@ using namespace std;
 struct subscriber_info {
     string id_client;
     string ip_server;
-    int server_port;
+    int32_t server_port;
+    int32_t socket_fd;
+    multiset<string> subscribed_topics;
+};
+
+struct topic_data {
+    vector<subscriber_info> subscribers;
 };
 
 struct database {
     multiset<string> id_subscribers;
     multiset<subscriber_info> subscribers;
     map<int32_t, subscriber_info> connected_subscribers;
+    map<string, topic_data> topic_subscribers;
+};
 
+struct recieved_udp_data {
+    char topic[50];
+    uint8_t data_type;
+    char message[1500];
+    string ip_udp; 
+    int32_t udp_port;
 };
 
 
@@ -49,7 +63,6 @@ void send_close_message_subscriber(int32_t closing_socket) {
 }
 
 void shutdown_server(int32_t &socketfd_udp, int32_t &socketfd_tcp) {
-    cout << "Am ajuns aici\n";
     for (auto u : server_database.connected_subscribers) {
         send_close_message_subscriber(u.first);
     }
@@ -66,6 +79,7 @@ void process_subscriber(sockaddr_in &subscriber, int32_t socket_tcp) {
     int32_t check_ret = recv(socket_tcp, id, 50, 0);
     ERROR(check_ret < 0, "Error, recv failed!");
     current_subscriber_info.id_client = id;
+    current_subscriber_info.socket_fd = socket_tcp;
     char s[200];
     inet_ntop(AF_INET, &(subscriber.sin_addr), s, 16);
     current_subscriber_info.ip_server = s;
@@ -80,6 +94,15 @@ void process_subscriber(sockaddr_in &subscriber, int32_t socket_tcp) {
         cout << "Client " << current_subscriber_info.id_client << " already connected.\n";
     }
 }   
+
+string nr_to_string(int32_t number) {
+    string message = "";
+    while (number) {
+        message = char(number % 10 + '0') + message;
+        number /= 10;
+    }
+    return message;
+}
 
 
 int main(int argc, char *argv[]) {
@@ -145,8 +168,48 @@ int main(int argc, char *argv[]) {
             }
 
             if (FD_ISSET(socketfd_udp, &temporary_fds) && i == socketfd_udp) {
+                char buf[MAX_SIZE];
+                memset(buf, 0, MAX_SIZE);
+                socklen_t sockLen = sizeof(struct sockaddr_in);
+                sockaddr_in *udp_sender = (sockaddr_in *)malloc(sizeof(sockaddr_in));
+                check_ret = recvfrom(socketfd_udp, buf, MAX_SIZE, 0, (struct sockaddr *) udp_sender, &sockLen);
+                ERROR(check_ret < 0, "Error, recieving data from udp");
                 
-                
+                recieved_udp_data udp_data;
+                memcpy(&udp_data, buf, sizeof(recieved_udp_data));
+                udp_data.ip_udp = inet_ntoa(udp_sender->sin_addr);
+                udp_data.udp_port = udp_sender->sin_port;
+                string port_string = nr_to_string(udp_data.udp_port);
+
+                string message_to_send = udp_data.ip_udp + ":" + port_string + " - " + udp_data.topic + " - ";
+                if ((int32_t) udp_data.data_type == 0) {
+                    message_to_send += "INT - ";
+                    int32_t int_nr;
+                    memcpy(&int_nr, udp_data.message + 1, sizeof(int32_t));
+                    int_nr = ntohl(int_nr);
+                    message_to_send += (udp_data.message[0] == 1 ? ("-" + nr_to_string(int_nr)) : nr_to_string(int_nr));
+                    message_to_send += "\n";
+                } else if ((int32_t) udp_data.data_type == 1) {
+                    message_to_send += "SHORT_REAL - ";
+                    uint16_t short_nr;
+                    memcpy(&short_nr, udp_data.message, sizeof(uint16_t));
+                    short_nr = ntohs(short_nr);
+                    string float_result = nr_to_string(short_nr);
+                    float_result = float_result.substr(0, float_result.size() - 2) + "." + float_result.substr(float_result.size() - 2, 2);
+                    message_to_send += float_result;
+                    message_to_send += "\n";
+
+                } else if ((int32_t) udp_data.data_type == 2) {
+                    message_to_send += "FLOAT - ";
+                    message_to_send += "\n";
+                } else if ((int32_t) udp_data.data_type == 3) {
+                    message_to_send += "\n";
+                }
+
+                for (auto u : server_database.topic_subscribers[udp_data.topic].subscribers) {
+                    check_ret = send(u.socket_fd, message_to_send.c_str(), message_to_send.size(), 0);
+                    ERROR(check_ret < 0, "Error, failed to send message");
+                }
 
                 continue;
             }
@@ -166,9 +229,10 @@ int main(int argc, char *argv[]) {
 
             if (FD_ISSET(i, &temporary_fds)) {
                 char message[MAX_SIZE];
+                memset(message, 0, sizeof(message));
                 check_ret = recv(i, message, sizeof(message), 0);
                 ERROR(check_ret < 0, "Error, recieving message failed");
-
+                
                 if (!check_ret) {
                     subscriber_info disconnected_subscriber = server_database.connected_subscribers[i];
                     server_database.connected_subscribers.erase(i);
@@ -176,6 +240,26 @@ int main(int argc, char *argv[]) {
                     cout << "Client " << disconnected_subscriber.id_client << " disconnected.\n";
                     close(i);
                     FD_CLR(i, &read_fds);
+                }
+                string command = "subscribe";
+                int sz = strlen(message);
+                for (int i = 0; i < sz; ++i) {
+                    if (message[i] == ' ') {
+                        message[i] = '\0';
+                    }
+                }
+                bool ok = 1;
+                for (int i = 0; i < command.size(); ++i) {
+                    if (command[i] != message[i]) {
+                        ok = 0;
+                        break;
+                    }
+                }
+                if (ok) {
+                    char topic_name[MAX_SIZE];
+                    memset(topic_name, 0, sizeof(topic_name));
+                    memcpy(topic_name, message + command.size() + 1, strlen(message + command.size() + 1));
+                    server_database.topic_subscribers[topic_name].subscribers.push_back(server_database.connected_subscribers[i]);
                 }
             }
 
