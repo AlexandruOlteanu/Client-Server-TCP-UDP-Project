@@ -22,6 +22,7 @@ struct subscriber_info {
     string ip_server;
     int32_t server_port;
     int32_t socket_fd;
+    int16_t store_forward;
     multiset<string> subscribed_topics;
 };
 
@@ -61,7 +62,7 @@ bool check_exit_command() {
 }
 
 void send_close_message_subscriber(int32_t closing_socket) {
-    int check_res = send(closing_socket, "Close", 5, 0);
+    int check_res = send(closing_socket, "Close\n", 6, 0);
     ERROR(check_res < 0, "Error, Closing message failed");
 }
 
@@ -95,6 +96,7 @@ void process_subscriber(sockaddr_in &subscriber, int32_t socket_tcp) {
     }
     else {
         cout << "Client " << current_subscriber_info.id_client << " already connected.\n";
+        send_close_message_subscriber(current_subscriber_info.socket_fd);
     }
 }   
 
@@ -263,10 +265,12 @@ int main(int argc, char *argv[]) {
                 ERROR(check_ret < 0, "Error, recieving message failed");
                 
                 if (!check_ret) {
-                    subscriber_info disconnected_subscriber = server_database.connected_subscribers[i];
-                    server_database.connected_subscribers.erase(i);
-                    server_database.id_subscribers.erase(disconnected_subscriber.id_client);
-                    cout << "Client " << disconnected_subscriber.id_client << " disconnected.\n";
+                    if (server_database.connected_subscribers.find(i) != server_database.connected_subscribers.end()) {
+                        subscriber_info disconnected_subscriber = server_database.connected_subscribers[i];
+                        server_database.connected_subscribers.erase(i);
+                        server_database.id_subscribers.erase(disconnected_subscriber.id_client);
+                        cout << "Client " << disconnected_subscriber.id_client << " disconnected.\n";
+                    }
                     close(i);
                     FD_CLR(i, &read_fds);
                     continue;

@@ -133,7 +133,14 @@ int main(int argc, char *argv[]) {
                     }
                     ++j;
                 }
-                cout << buffer;
+                string message = buffer;
+                if (message == "Close\n") {
+                    main_condition = 0;
+                    break;
+                }
+                else {
+                    cout << message;
+                }
             }
         }
     }
