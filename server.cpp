@@ -201,14 +201,36 @@ int main(int argc, char *argv[]) {
 
                 } else if ((int32_t) udp_data.data_type == 2) {
                     message_to_send += "FLOAT - ";
+                    bool sign = 0;
+                    if (udp_data.message[0] == 1) {
+                        sign = 1;
+                    }
+                    uint32_t number;
+                    memcpy(&number, udp_data.message + 1, sizeof(uint32_t));
+                    uint8_t power;
+                    memcpy(&power, udp_data.message + 1 + sizeof(uint32_t), sizeof(uint8_t));
+                    number = ntohl(number);
+                    double result = number / (double) (pow(10, power));
+                    result *= (pow(10, power));
+                    result = (int)result;
+                    result /= (pow(10, power));
+                    string res = to_string(result);
+                    while (res[res.size() - 1] == '0') {
+                        res.erase(res.size() - 1);
+                    } 
+                    message_to_send += (sign ? ("-" + res) : res);
                     message_to_send += "\n";
                 } else if ((int32_t) udp_data.data_type == 3) {
+                    message_to_send += "STRING - ";
+                    message_to_send += udp_data.message;
                     message_to_send += "\n";
                 }
 
                 for (auto u : server_database.topic_subscribers[udp_data.topic].subscribers) {
-                    check_ret = send(u.socket_fd, message_to_send.c_str(), message_to_send.size(), 0);
-                    ERROR(check_ret < 0, "Error, failed to send message");
+                    if (server_database.connected_subscribers.find(u.socket_fd) != server_database.connected_subscribers.end()) {
+                        check_ret = send(u.socket_fd, message_to_send.c_str(), message_to_send.size(), 0);
+                        ERROR(check_ret < 0, "Error, failed to send message");
+                    }
                 }
 
                 continue;
@@ -240,6 +262,7 @@ int main(int argc, char *argv[]) {
                     cout << "Client " << disconnected_subscriber.id_client << " disconnected.\n";
                     close(i);
                     FD_CLR(i, &read_fds);
+                    continue;
                 }
                 string command = "subscribe";
                 int sz = strlen(message);
