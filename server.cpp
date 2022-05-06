@@ -1,9 +1,12 @@
 #include <bits/stdc++.h>
+#include <stdio.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include "error.h"
 using namespace std;
 
@@ -151,6 +154,10 @@ int main(int argc, char *argv[]) {
     FD_SET(STDIN_FILENO, &read_fds);
 
     int32_t maximum_fd = max(socketfd_udp, socketfd_tcp);
+
+    int neagle = 1;
+    check_ret = setsockopt(socketfd_tcp, IPPROTO_TCP, TCP_NODELAY, &neagle, sizeof(neagle));
+    ERROR(check_ret < 0, "disable neagle err");
 
     bool main_condition = true;
     while (main_condition) {

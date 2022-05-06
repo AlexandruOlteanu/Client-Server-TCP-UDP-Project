@@ -12,7 +12,7 @@ from os import path
 from time import sleep
 
 # default port for the  server
-port = "12242"
+port = "12241"
 
 # default IP for the server
 ip = "127.0.0.1"

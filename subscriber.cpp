@@ -1,9 +1,12 @@
 #include <bits/stdc++.h>
+#include <stdio.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
+#include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/types.h>
 #include "error.h"
 
 #define CLIENT_NR_ARGS 4
@@ -86,6 +89,10 @@ int main(int argc, char *argv[]) {
     ERROR(check_ret < 0, "Error, sending tcp id failed!");
 
     int32_t maximum_fd = socketfd_tcp;
+
+    int neagle = 1;
+    check_ret = setsockopt(socketfd_tcp, IPPROTO_TCP, TCP_NODELAY, &neagle, sizeof(neagle));
+    ERROR(check_ret < 0, "disable neagle err");
 
     bool main_condition = true;
 
