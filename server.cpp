@@ -22,7 +22,7 @@ struct subscriber_info {
     string ip_server;
     int32_t server_port;
     int32_t socket_fd;
-    int16_t store_forward;
+    bool store_forward;
     multiset<string> subscribed_topics;
 };
 
@@ -293,6 +293,14 @@ int main(int argc, char *argv[]) {
                     char topic_name[MAX_SIZE];
                     memset(topic_name, 0, sizeof(topic_name));
                     memcpy(topic_name, message + command.size() + 1, strlen(message + command.size() + 1));
+                    char store_forward = 0;
+                    memcpy(&store_forward, message + command.size() + 1 + strlen(message + command.size() + 1) + 1, sizeof(char));
+                    if (store_forward == '0') {
+                        server_database.connected_subscribers[i].store_forward = 0;
+                    }
+                    else {
+                        server_database.connected_subscribers[i].store_forward = 1;
+                    }
                     server_database.topic_subscribers[topic_name].subscribers.push_back(server_database.connected_subscribers[i]);
                 }
                 command = "unsubscribe";
