@@ -295,6 +295,29 @@ int main(int argc, char *argv[]) {
                     memcpy(topic_name, message + command.size() + 1, strlen(message + command.size() + 1));
                     server_database.topic_subscribers[topic_name].subscribers.push_back(server_database.connected_subscribers[i]);
                 }
+                command = "unsubscribe";
+                ok = 1;
+                for (int i = 0; i < command.size(); ++i) {
+                    if (command[i] != message[i]) {
+                        ok = 0;
+                        break;
+                    }
+                }
+                if (ok) {
+                    char topic_name[MAX_SIZE];
+                    memset(topic_name, 0, sizeof(topic_name));
+                    memcpy(topic_name, message + command.size() + 1, strlen(message + command.size() + 1));
+                    for (int j = 0; j < server_database.topic_subscribers[topic_name].subscribers.size(); ++j) {
+                        if (server_database.topic_subscribers[topic_name].subscribers[j].socket_fd == i) {
+                            auto pos = server_database.topic_subscribers[topic_name].subscribers.begin() + j;
+                            server_database.topic_subscribers[topic_name].subscribers.erase(pos);
+                            break;
+                        }
+                    }
+                }
+
+
+
             }
 
         }
