@@ -165,9 +165,7 @@ void process_subscriber(sockaddr_in &subscriber, int32_t socket_tcp) {
     ERROR(check_ret < 0, "Error, recv failed!");
     current_subscriber_info.id_client = id;
     current_subscriber_info.socket_fd = socket_tcp;
-    char s[200];
-    inet_ntop(AF_INET, &(subscriber.sin_addr), s, 16);
-    current_subscriber_info.ip_server = s;
+    current_subscriber_info.ip_server = inet_ntoa(subscriber.sin_addr);
     current_subscriber_info.server_port = subscriber.sin_port;
     if (server_database.id_subscribers.find(current_subscriber_info.id_client) == server_database.id_subscribers.end()) {
         cout << "New client " << current_subscriber_info.id_client << " connected from " << 
@@ -203,7 +201,7 @@ int string_to_nr(string message) {
 int main(int argc, char *argv[]) {
 
     setvbuf(stdout, NULL, _IONBF, BUFSIZ);
-    ERROR(argc < SERVER_NR_ARGS, "Error number of parameters!");
+    ERROR(argc != SERVER_NR_ARGS, "Error number of parameters!");
 
     int32_t socketfd_udp = -1, socketfd_tcp = -1;
 
@@ -218,10 +216,11 @@ int main(int argc, char *argv[]) {
     ERROR(server_port <= TAKEN_PORTS, "Error, server already taken by main services!");
 
     sockaddr_in *server_adress = (sockaddr_in *)malloc(sizeof(sockaddr_in));
-    sockaddr_in *subscriber_address = (sockaddr_in *)malloc(sizeof(sockaddr_in));
     ERROR(server_adress == NULL, "Error, memory for server adress not allocated!");
+    sockaddr_in *subscriber_address = (sockaddr_in *)malloc(sizeof(sockaddr_in));
+    ERROR(subscriber_address == NULL, "Error, memory for subscriber not allocated");
 
-    memset(server_adress, 0, sizeof(server_adress));
+    memset(server_adress, 0, sizeof(sockaddr_in));
     server_adress->sin_port = htons(server_port);
     server_adress->sin_addr.s_addr = INADDR_ANY;
     server_adress->sin_family = AF_INET;
@@ -264,14 +263,15 @@ int main(int argc, char *argv[]) {
 
             if (FD_ISSET(socketfd_udp, &temporary_fds) && i == socketfd_udp) {
                 char *message = (char *)malloc(MAX_SIZE * sizeof(char));
+                ERROR(message == NULL, "Error, memory for message was not allocated");
                 memset(message, 0, MAX_SIZE);
-                socklen_t sockLen = sizeof(struct sockaddr_in);
+                uint32_t addr_len = sizeof(sockaddr_in);
                 sockaddr_in *udp_sender = (sockaddr_in *)malloc(sizeof(sockaddr_in));
-                check_ret = recvfrom(socketfd_udp, message, MAX_SIZE, 0, (struct sockaddr *) udp_sender, &sockLen);
+                check_ret = recvfrom(socketfd_udp, message, MAX_SIZE, 0, (struct sockaddr *) udp_sender, &addr_len);
                 ERROR(check_ret < 0, "Error, recieving data from udp");
                 
                 recieved_udp_data udp_data;
-                memcpy(&udp_data, message, sizeof(recieved_udp_data));
+                memcpy((void *)&udp_data, message, sizeof(recieved_udp_data));
                 udp_data.ip_udp = inet_ntoa(udp_sender->sin_addr);
                 udp_data.udp_port = udp_sender->sin_port;
                 string port_string = nr_to_string(udp_data.udp_port);
@@ -307,14 +307,14 @@ int main(int argc, char *argv[]) {
             }
 
             if (FD_ISSET(socketfd_tcp, &temporary_fds) && i == socketfd_tcp) {
-                socklen_t new_socketfd_tcp_size = sizeof(sockaddr_in);
-                int32_t new_socketfd_tcp = accept(socketfd_tcp, (sockaddr *)subscriber_address, (socklen_t *) &new_socketfd_tcp_size); 
-                ERROR(new_socketfd_tcp < 0, "Error, accepting connection failed");
+                uint32_t addr_len = sizeof(sockaddr_in);
+                int32_t tcp_sender = accept(socketfd_tcp, (sockaddr *)subscriber_address, (socklen_t *) &addr_len); 
+                ERROR(tcp_sender < 0, "Error, accepting connection failed");
                 
-                FD_SET(new_socketfd_tcp, &read_fds);
-                maximum_fd = max(maximum_fd, new_socketfd_tcp);
+                FD_SET(tcp_sender, &read_fds);
+                maximum_fd = max(maximum_fd, tcp_sender);
 
-                process_subscriber(*subscriber_address, new_socketfd_tcp);
+                process_subscriber(*subscriber_address, tcp_sender);
 
                 continue;
             }
@@ -343,14 +343,14 @@ int main(int argc, char *argv[]) {
                         message[i] = '\0';
                     }
                 }
-                bool ok = 1;
-                for (int i = 0; i < command.size(); ++i) {
+                bool equal = true;
+                for (int i = 0; i < (int32_t) command.size() && equal; ++i) {
                     if (command[i] != message[i]) {
-                        ok = 0;
+                        equal = false;
                         break;
                     }
                 }
-                if (ok) {
+                if (equal) {
                     char topic_name[MAX_SIZE];
                     memset(topic_name, 0, sizeof(topic_name));
                     memcpy(topic_name, message + command.size() + 1, strlen(message + command.size() + 1));
@@ -363,6 +363,7 @@ int main(int argc, char *argv[]) {
                     for (auto u : server_database.topic_subscribers[topic_name].subscribers) {
                         if (u.id_client == server_database.connected_subscribers[i].id_client) {
                             not_found = 1;
+                            break;
                         }
                     }
                     if (!not_found) {
@@ -370,18 +371,18 @@ int main(int argc, char *argv[]) {
                     }
                 }
                 command = "unsubscribe";
-                ok = 1;
-                for (int i = 0; i < command.size(); ++i) {
+                equal = true;
+                for (int i = 0; i < (int32_t) command.size() && equal; ++i) {
                     if (command[i] != message[i]) {
-                        ok = 0;
+                        equal = false;
                         break;
                     }
                 }
-                if (ok) {
+                if (equal) {
                     char topic_name[MAX_SIZE];
                     memset(topic_name, 0, sizeof(topic_name));
                     memcpy(topic_name, message + command.size() + 1, strlen(message + command.size() + 1));
-                    for (int j = 0; j < server_database.topic_subscribers[topic_name].subscribers.size(); ++j) {
+                    for (int j = 0; j < (int32_t) server_database.topic_subscribers[topic_name].subscribers.size(); ++j) {
                         if (server_database.topic_subscribers[topic_name].subscribers[j].socket_fd == i) {
                             auto pos = server_database.topic_subscribers[topic_name].subscribers.begin() + j;
                             server_database.topic_subscribers[topic_name].subscribers.erase(pos);

@@ -36,7 +36,7 @@ void check_command(int32_t socketfd_tcp, string message, string command_message)
     }
     if (ok) {
         char *buffer = (char *)malloc((int) message.size() * sizeof(char));
-        memset(buffer, 0, sizeof(buffer));
+        memset(buffer, 0, message.size());
         strcpy(buffer, message.c_str());
         int32_t check_ret = send(socketfd_tcp, buffer, strlen(buffer), 0);
         ERROR(check_ret < 0, "Error, sending tcp message failed");
@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
     sockaddr_in *server_adress = (sockaddr_in *)malloc(sizeof(sockaddr_in));
     ERROR(server_adress == NULL, "Error, memory for server adress not allocated!");
 
-    memset(server_adress, 0, sizeof(server_adress));
+    memset(server_adress, 0, sizeof(sockaddr_in));
     server_adress->sin_port = htons(server_port);
     int32_t check_ret = inet_aton(argv[2], &(*server_adress).sin_addr);
     server_adress->sin_family = AF_INET;
@@ -120,7 +120,7 @@ int main(int argc, char *argv[]) {
 
             if (FD_ISSET(i, &temporary_fds)) {
                 char *buffer = (char *)malloc(MAX_SIZE * sizeof(char));
-                memset(buffer, 0, sizeof(buffer));
+                memset(buffer, 0, MAX_SIZE);
                 int32_t j = 0;
                 check_ret = 1;
                 while (true) {
