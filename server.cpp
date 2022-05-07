@@ -244,7 +244,7 @@ int main(int argc, char *argv[]) {
 
     int32_t disable_neagle = 1;
     check_ret = setsockopt(socketfd_tcp, IPPROTO_TCP, TCP_NODELAY, &disable_neagle, sizeof(int32_t));
-    ERROR(check_ret < 0, "disable neagle err");
+    ERROR(check_ret < 0, "Error, disable neagle algorithm");
 
     bool main_condition = true;
     while (main_condition) {

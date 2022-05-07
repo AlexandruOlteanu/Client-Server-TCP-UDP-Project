@@ -56,21 +56,24 @@ void shutdown_subscriber(int32_t socketfd_tcp) {
     shutdown(socketfd_tcp, 2);
 }
 
+int string_to_nr(string message) {
+    int32_t number = 0;
+    for (auto digit : message) {
+        number = number * 10 + (digit - '0');
+    }
+    return number;
+}
 
 int main(int argc, char *argv[]) {
 
     setvbuf(stdout, NULL, _IONBF, BUFSIZ);
-    ERROR(argc < CLIENT_NR_ARGS, "Error number of parameters!");
+    ERROR(argc != CLIENT_NR_ARGS, "Error number of parameters!");
 
     int32_t socketfd_tcp = -1;
     socketfd_tcp = socket(PF_INET, SOCK_STREAM, AUTOMATED_PROTOCOL);
     ERROR(socketfd_tcp == -1, "Error creating tcp socket!");
 
-    int32_t server_port = 0;
-    std :: string string_port = argv[3];
-    for (auto digit : string_port) {
-        server_port = server_port * 10 + (digit - '0');
-    }
+    int32_t server_port = string_to_nr(argv[3]);
 
     ERROR(server_port <= TAKEN_PORTS, "Error, server already taken by main services!");
 
@@ -90,9 +93,9 @@ int main(int argc, char *argv[]) {
 
     int32_t maximum_fd = socketfd_tcp;
 
-    int neagle = 1;
-    check_ret = setsockopt(socketfd_tcp, IPPROTO_TCP, TCP_NODELAY, &neagle, sizeof(neagle));
-    ERROR(check_ret < 0, "disable neagle err");
+    int disable_neagle = 1;
+    check_ret = setsockopt(socketfd_tcp, IPPROTO_TCP, TCP_NODELAY, &disable_neagle, sizeof(int32_t));
+    ERROR(check_ret < 0, "Error, disable neagle algorithm");
 
     bool main_condition = true;
 
