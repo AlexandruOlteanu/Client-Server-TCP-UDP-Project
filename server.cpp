@@ -262,7 +262,7 @@ int main(int argc, char *argv[]) {
             }
 
             if (FD_ISSET(socketfd_udp, &temporary_fds) && i == socketfd_udp) {
-                char *message = (char *)malloc(MAX_SIZE * sizeof(char));
+                char *message = (char *)malloc(2000 * sizeof(char));
                 ERROR(message == NULL, "Error, memory for message was not allocated");
                 memset(message, 0, MAX_SIZE);
                 uint32_t addr_len = sizeof(sockaddr_in);

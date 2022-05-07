@@ -1,15 +1,12 @@
-# Copyright Radu-Andrei Dumitrescu 322CA 2021
+CC = g++
+#CFLAGS = -Wall -Wextra -O2
+LDLIBS = -lm
 
-all:
-	g++ server.cpp -g -Wall -o server -std=c++11;
-	g++ subscriber.cpp -g -Wall -o subscriber -std=c++11;
+build: 
+	g++ server.cpp -o server 
+	g++ subscriber.cpp -o subscriber 
 
-
-server:
-	g++ server.cpp -g -Wall -o server -std=c++11;
-
-subscriber:
-	g++ subscriber.cpp -g -Wall -o subscriber -std=c++11;
+.PHONY: clean
 
 clean:
-	rm -rf subscriber server
+	rm -rf *.o server subscriber

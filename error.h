@@ -8,7 +8,7 @@
  * Macro de verificare a erorilor
  * Exemplu:
  *     int fd = open(file_name, O_RDONLY);
- *     DIE(fd == -1, "open failed");
+ *     ERROR(fd == -1, "open failed");
  */
 
 #define ERROR(assertion, call_description)	\
@@ -20,7 +20,4 @@
 			exit(EXIT_FAILURE);				\
 		}									\
 	} while(0)
-
-#define MAX_CLIENTS	100	// numarul maxim de clienti in asteptare
-
 #endif
