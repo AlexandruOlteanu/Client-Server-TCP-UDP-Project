@@ -22,8 +22,8 @@ struct subscriber_info {
     string ip_server;
     int32_t server_port;
     int32_t socket_fd;
-    bool store_forward;
     multiset<string> subscribed_topics;
+    multiset<string> subscribed_sf_1;
 };
 
 struct topic_data {
@@ -45,6 +45,19 @@ struct recieved_udp_data {
     int32_t udp_port;
 };
 
+unordered_map<string, deque<string>> waiting_messages;
+
+void send_waiting_messages(subscriber_info subscriber) {
+
+    int check_ret = 1;
+    while (!waiting_messages[subscriber.id_client].empty()) {
+        string message_to_send = waiting_messages[subscriber.id_client].front();
+        check_ret = send(subscriber.socket_fd, message_to_send.c_str(), message_to_send.size(), 0);
+        ERROR(check_ret < 0,  "Error, sending udp message\n");
+        waiting_messages[subscriber.id_client].pop_front();
+    }
+
+}
 
 database server_database; 
 
@@ -93,6 +106,7 @@ void process_subscriber(sockaddr_in &subscriber, int32_t socket_tcp) {
         current_subscriber_info.ip_server << ":" << current_subscriber_info.server_port <<".\n";
         server_database.id_subscribers.insert(current_subscriber_info.id_client);
         server_database.connected_subscribers.insert({socket_tcp, current_subscriber_info});
+        send_waiting_messages(current_subscriber_info);
     }
     else {
         cout << "Client " << current_subscriber_info.id_client << " already connected.\n";
@@ -240,6 +254,11 @@ int main(int argc, char *argv[]) {
                         check_ret = send(u.socket_fd, message_to_send.c_str(), message_to_send.size(), 0);
                         ERROR(check_ret < 0, "Error, failed to send message");
                     }
+                    else {
+                        if (u.subscribed_sf_1.find(udp_data.topic) != u.subscribed_sf_1.end()) {
+                            waiting_messages[u.id_client].push_back(message_to_send);
+                        }
+                    }
                 }
 
                 continue;
@@ -295,13 +314,18 @@ int main(int argc, char *argv[]) {
                     memcpy(topic_name, message + command.size() + 1, strlen(message + command.size() + 1));
                     char store_forward = 0;
                     memcpy(&store_forward, message + command.size() + 1 + strlen(message + command.size() + 1) + 1, sizeof(char));
-                    if (store_forward == '0') {
-                        server_database.connected_subscribers[i].store_forward = 0;
+                    if (store_forward == '1') {
+                        server_database.connected_subscribers[i].subscribed_sf_1.insert(topic_name);
                     }
-                    else {
-                        server_database.connected_subscribers[i].store_forward = 1;
+                    bool not_found = 0;
+                    for (auto u : server_database.topic_subscribers[topic_name].subscribers) {
+                        if (u.id_client == server_database.connected_subscribers[i].id_client) {
+                            not_found = 1;
+                        }
                     }
-                    server_database.topic_subscribers[topic_name].subscribers.push_back(server_database.connected_subscribers[i]);
+                    if (!not_found) {
+                        server_database.topic_subscribers[topic_name].subscribers.push_back(server_database.connected_subscribers[i]);
+                    }
                 }
                 command = "unsubscribe";
                 ok = 1;
