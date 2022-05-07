@@ -47,6 +47,74 @@ struct recieved_udp_data {
 
 unordered_map<string, deque<string>> waiting_messages;
 
+string nr_to_string(int32_t number);
+
+struct extract_message {
+
+    string build_udp_message(recieved_udp_data udp_data) {
+        string message_to_send = udp_data.ip_udp + ":" + nr_to_string(udp_data.udp_port) + " - " + udp_data.topic + " - ";
+        return message_to_send;
+    }
+
+    string extract_int(recieved_udp_data udp_data) {
+        string message_to_send = build_udp_message(udp_data);
+        message_to_send += "INT - ";
+        int32_t int_nr;
+        memcpy(&int_nr, udp_data.message + 1, sizeof(int32_t));
+        int_nr = ntohl(int_nr);
+        message_to_send += (udp_data.message[0] == 1 ? ("-" + nr_to_string(int_nr)) : nr_to_string(int_nr));
+        message_to_send += "\n";
+        return message_to_send;
+    }
+
+    string extract_short_real(recieved_udp_data udp_data) {
+        string message_to_send = build_udp_message(udp_data);
+        message_to_send += "SHORT_REAL - ";
+        uint16_t short_nr;
+        memcpy(&short_nr, udp_data.message, sizeof(uint16_t));
+        short_nr = ntohs(short_nr);
+        string float_result = nr_to_string(short_nr);
+        float_result = float_result.substr(0, float_result.size() - 2) + "." + float_result.substr(float_result.size() - 2, 2);
+        message_to_send += float_result;
+        message_to_send += "\n";
+        return message_to_send;
+    }
+
+    string extract_float(recieved_udp_data udp_data) {
+        string message_to_send = build_udp_message(udp_data);
+        message_to_send += "FLOAT - ";
+        bool sign = 0;
+        if (udp_data.message[0] == 1) {
+            sign = 1;
+        }
+        uint32_t number;
+        memcpy(&number, udp_data.message + 1, sizeof(uint32_t));
+        uint8_t power;
+        memcpy(&power, udp_data.message + 1 + sizeof(uint32_t), sizeof(uint8_t));
+        number = ntohl(number);
+        double result = number / (double) (pow(10, power));
+        result *= (pow(10, power));
+        result = (int)result;
+        result /= (pow(10, power));
+        string res = to_string(result);
+        while (res[res.size() - 1] == '0') {
+            res.erase(res.size() - 1);
+        } 
+        message_to_send += (sign ? ("-" + res) : res);
+        message_to_send += "\n";
+        return message_to_send;
+    }
+
+    string extract_string(recieved_udp_data udp_data) {
+        string message_to_send = build_udp_message(udp_data);
+        message_to_send += "STRING - ";
+        message_to_send += udp_data.message;
+        message_to_send += "\n";
+        return message_to_send;
+    }
+};
+
+
 void send_waiting_messages(subscriber_info subscriber) {
 
     int check_ret = 1;
@@ -123,6 +191,14 @@ string nr_to_string(int32_t number) {
     return message;
 }
 
+int string_to_nr(string message) {
+    int32_t number = 0;
+    for (auto digit : message) {
+        number = number * 10 + (digit - '0');
+    }
+    return number;
+}
+
 
 int main(int argc, char *argv[]) {
 
@@ -137,12 +213,8 @@ int main(int argc, char *argv[]) {
     socketfd_tcp = socket(PF_INET, SOCK_STREAM, AUTOMATED_PROTOCOL);
     ERROR(socketfd_tcp == -1, "Error creating tcp socket!");
 
-    int32_t server_port = 0;
-    std :: string string_port = argv[1];
-    for (auto digit : string_port) {
-        server_port = server_port * 10 + (digit - '0');
-    }
-    
+    int32_t server_port = string_to_nr(argv[1]);
+
     ERROR(server_port <= TAKEN_PORTS, "Error, server already taken by main services!");
 
     sockaddr_in *server_adress = (sockaddr_in *)malloc(sizeof(sockaddr_in));
@@ -171,8 +243,8 @@ int main(int argc, char *argv[]) {
 
     int32_t maximum_fd = max(socketfd_udp, socketfd_tcp);
 
-    int neagle = 1;
-    check_ret = setsockopt(socketfd_tcp, IPPROTO_TCP, TCP_NODELAY, &neagle, sizeof(neagle));
+    int32_t disable_neagle = 1;
+    check_ret = setsockopt(socketfd_tcp, IPPROTO_TCP, TCP_NODELAY, &disable_neagle, sizeof(int32_t));
     ERROR(check_ret < 0, "disable neagle err");
 
     bool main_condition = true;
@@ -191,62 +263,32 @@ int main(int argc, char *argv[]) {
             }
 
             if (FD_ISSET(socketfd_udp, &temporary_fds) && i == socketfd_udp) {
-                char buf[MAX_SIZE];
-                memset(buf, 0, MAX_SIZE);
+                char *message = (char *)malloc(MAX_SIZE * sizeof(char));
+                memset(message, 0, MAX_SIZE);
                 socklen_t sockLen = sizeof(struct sockaddr_in);
                 sockaddr_in *udp_sender = (sockaddr_in *)malloc(sizeof(sockaddr_in));
-                check_ret = recvfrom(socketfd_udp, buf, MAX_SIZE, 0, (struct sockaddr *) udp_sender, &sockLen);
+                check_ret = recvfrom(socketfd_udp, message, MAX_SIZE, 0, (struct sockaddr *) udp_sender, &sockLen);
                 ERROR(check_ret < 0, "Error, recieving data from udp");
                 
                 recieved_udp_data udp_data;
-                memcpy(&udp_data, buf, sizeof(recieved_udp_data));
+                memcpy(&udp_data, message, sizeof(recieved_udp_data));
                 udp_data.ip_udp = inet_ntoa(udp_sender->sin_addr);
                 udp_data.udp_port = udp_sender->sin_port;
                 string port_string = nr_to_string(udp_data.udp_port);
 
-                string message_to_send = udp_data.ip_udp + ":" + port_string + " - " + udp_data.topic + " - ";
+                extract_message extract;
+                string message_to_send;
                 if ((int32_t) udp_data.data_type == 0) {
-                    message_to_send += "INT - ";
-                    int32_t int_nr;
-                    memcpy(&int_nr, udp_data.message + 1, sizeof(int32_t));
-                    int_nr = ntohl(int_nr);
-                    message_to_send += (udp_data.message[0] == 1 ? ("-" + nr_to_string(int_nr)) : nr_to_string(int_nr));
-                    message_to_send += "\n";
-                } else if ((int32_t) udp_data.data_type == 1) {
-                    message_to_send += "SHORT_REAL - ";
-                    uint16_t short_nr;
-                    memcpy(&short_nr, udp_data.message, sizeof(uint16_t));
-                    short_nr = ntohs(short_nr);
-                    string float_result = nr_to_string(short_nr);
-                    float_result = float_result.substr(0, float_result.size() - 2) + "." + float_result.substr(float_result.size() - 2, 2);
-                    message_to_send += float_result;
-                    message_to_send += "\n";
-
-                } else if ((int32_t) udp_data.data_type == 2) {
-                    message_to_send += "FLOAT - ";
-                    bool sign = 0;
-                    if (udp_data.message[0] == 1) {
-                        sign = 1;
-                    }
-                    uint32_t number;
-                    memcpy(&number, udp_data.message + 1, sizeof(uint32_t));
-                    uint8_t power;
-                    memcpy(&power, udp_data.message + 1 + sizeof(uint32_t), sizeof(uint8_t));
-                    number = ntohl(number);
-                    double result = number / (double) (pow(10, power));
-                    result *= (pow(10, power));
-                    result = (int)result;
-                    result /= (pow(10, power));
-                    string res = to_string(result);
-                    while (res[res.size() - 1] == '0') {
-                        res.erase(res.size() - 1);
-                    } 
-                    message_to_send += (sign ? ("-" + res) : res);
-                    message_to_send += "\n";
-                } else if ((int32_t) udp_data.data_type == 3) {
-                    message_to_send += "STRING - ";
-                    message_to_send += udp_data.message;
-                    message_to_send += "\n";
+                    message_to_send = extract.extract_int(udp_data);
+                } 
+                else if ((int32_t) udp_data.data_type == 1) {
+                    message_to_send = extract.extract_short_real(udp_data);
+                } 
+                else if ((int32_t) udp_data.data_type == 2) {
+                    message_to_send = extract.extract_float(udp_data);
+                } 
+                else if ((int32_t) udp_data.data_type == 3) {
+                    message_to_send = extract.extract_string(udp_data);
                 }
 
                 for (auto u : server_database.topic_subscribers[udp_data.topic].subscribers) {
@@ -347,11 +389,7 @@ int main(int argc, char *argv[]) {
                         }
                     }
                 }
-
-
-
             }
-
         }
     }
 

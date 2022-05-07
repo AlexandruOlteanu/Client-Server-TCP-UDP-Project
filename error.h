@@ -21,7 +21,6 @@
 		}									\
 	} while(0)
 
-#define BUFLEN		256	// dimensiunea maxima a calupului de date
 #define MAX_CLIENTS	100	// numarul maxim de clienti in asteptare
 
 #endif
