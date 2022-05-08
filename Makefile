@@ -1,3 +1,4 @@
+#<Copyright Alexandru Olteanu, grupa 322CA, alexandruolteanu2001@gmail.com>
 CC = g++
 #CFLAGS = -Wall -Wextra -O2
 LDLIBS = -lm

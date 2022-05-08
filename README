@@ -1,0 +1,53 @@
+<Copyright Alexandru Olteanu, grupa 322CA, alexandruolteanu2001@gmail.com>
+
+In aceasta tema am avut de implementat conexiunea realizata de un server
+intre clienti de tip UDP si clienti de tip TCP. Functionalitatile unui client 
+de tip UDP a fost deja implementate de echipa de Pcom. Atfel, voi descrie pe
+scurt modul de lucru pentru celelalte doua componente:
+    1)Serverul
+        Serverul reprezinta punctul de legatura dintre cele doua tipuri de 
+clienti, astfel conexiunile au fost in mare parte indreptate spre acesta. 
+Am inceput implementarea sa prin identificarea portului, apoi crearea unor
+socketi gata sa fie utilizati ca si conexiune pentru cele doua tipuri de 
+clienti. Acesti socketi au trebuit sa fie legati la adresa serverului, adresa 
+care a fost construita cu ajutorul indrumarului de laborator. In continuare, 
+a trebuit sa deschid o functionalitate de listen pe socketul tcp, astfel 
+serverul sa poata primi mesaje directe de la acesta. 
+        In continuare, dupa deactivarea algoritmului neagle si 
+formarea setului de file descriptori, au fost procesate 
+diferitele interactiuni printre care: "Citirea comenzii de exit de la stdin", 
+"Primirea unor date de la clientul udp", "Noua conexiune de la un client TCP" 
+si in cele din urma "Primirea mesajelor de la clientul TCP". Fiecare din acestea
+au fost realizate sistematic, folosind diferite structuri de date si metode de parsare
+a informatiior printre care (String-uri si functii aferente acestora, mapa, structuri, 
+vectori, dequeue, multiset, etc). Toate aceste functionalitati sunt descrise in amanunt
+prin comentarii in cod. 
+     2)Subscriber-ul
+         Subscriber-ul a fost in mare parte implementat la fel ca in laborator, cu 
+mici modificari in functiile de nevoile curente. Prin asta ma refer la introducerea 
+functionalitatii de verificare a comenzii de exit, trimiterea catre server a id-ului 
+acestuia, citirea byte cu byte si verificarea pentru delimitatori, etc. Acesta a fost
+construit sa poata primi mesaje de la server si sa trimita mesaje catre acesta.
+
+    Flow-ul pe scurt:
+        Serverul se deschide, dupa care asteapta conexiuni din partea clientilor TCP. 
+    In momentul in care unul din acestia se conecteaza, in server apare mesajul de 
+    "New client <ID> connected ...". Cu toate acestea, se fac verificari si nu se permite 
+    conexiunea dubla in cazul deja exitentei acelui client in sistem. Daca la un moment dat
+    clientul se intrerupe, serverul va intercepta si va afisa mesajul de disconnect al
+    serverului. In continuare, odata ce mai multi clienti sunt conectati, acestia pot da 
+    comenzi de subscribe sau unsibscribe pentru diverse topicuri cu optiune de store 
+    forward pentru cand sunt deconectati. Apoi, la primirea unui mesaj udp, acesta este procesat
+    de server si transmis corespunzator la clientii conectati la topicurile respective din 
+    care fac parte mesajele sau stocate pentru a fi trimise mai tarziu clientilor ce sunt in 
+    prezent deconectati. Astfel, acestea sunt in principal functionalitatile implementate de
+    conexiunea intre server, udp si tcp
+
+    Detalii:
+        In prezent, sunt trecute toate testele pe local cu exceptia celui de quick flow (Nu stiu de ce).
+        Pentru o rulare mai usoara se poate folosi ./checker.sh iar pentru trimiterea manuala de 
+        mesaje udp se poate folosi ./checkerudp.sh <PORT> din folder-ul pcom_hw2_udp_client
+
+    Parere:
+        O tema super faina, dificultate ok, am inteles mult mai bine cum functioneaza socketii si 
+        consider ca reprezinta o tema interesanta.
