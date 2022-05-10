@@ -44,7 +44,6 @@ construit sa poata primi mesaje de la server si sa trimita mesaje catre acesta.
     conexiunea intre server, udp si tcp
 
     Detalii:
-        In prezent, sunt trecute toate testele pe local cu exceptia celui de quick flow (Nu stiu de ce).
         Pentru o rulare mai usoara se poate folosi ./checker.sh iar pentru trimiterea manuala de 
         mesaje udp se poate folosi ./checkerudp.sh <PORT> din folder-ul pcom_hw2_udp_client
 
